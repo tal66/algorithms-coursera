@@ -5,93 +5,94 @@ namespace Algo
     public class Node
     {
         public int Val { get; set; }
-        public readonly List<Node> Neighbors;
-        public readonly List<Node> SuperVertexNodes;
+        public List<Node> SuperVertexNodes { get; }
+        public List<int> EdgesIds { get; }
 
         public Node(int val)
         {
             Val = val;
-            Neighbors = new List<Node>();
             SuperVertexNodes = new List<Node>();
             SuperVertexNodes.Add(this);
+            EdgesIds = new List<int>();
         }
 
-        public void AddNeighbor(Node node)
+        public void AddEdge(int id)
         {
-            Neighbors.Add(node);           
+            EdgesIds.Add(id);           
         }
 
-        public void RemoveNeighbor(Node Neighbor)
+        public void RemoveEdge(int id)
         {
-            Neighbors.Remove(Neighbor);
+            EdgesIds.Remove(id);
         }
     }
     
-    // could be improved..
-    public class Graph
+    
+    public class UndirectedGraph
     {
-        public List<Node> Nodes { get; } // need this for iteration
-        public List<Node[]> Edges { get; } // need this to choose random edge
+        public Dictionary<int, Node> NodesDict { get;}
+        public Dictionary<int, Node[]> EdgesDict { get;}
+        private int nodesCounter = 0;
+        private int edgesCounter = 0;
 
-        public Graph()
+        public UndirectedGraph()
         {
-            Nodes = new List<Node>();
-            Edges = new List<Node[]>();
+            NodesDict = new Dictionary<int, Node>();
+            EdgesDict = new Dictionary<int, Node[]>();
         }
 
-        public Graph(int n) : this()
+        public UndirectedGraph(int n) : this()
         {
-            Nodes.Capacity = n; 
+            NodesDict.EnsureCapacity(n);
             for (int i = 0; i < n; i++)
             {
-                Nodes.Add(new Node(i));
+                NodesDict.Add(i, new Node(i));
             }
         }
 
         public Node AddNode(int val)
         {
             Node node = new (val);
-            Nodes.Add(node);
+            NodesDict.Add(val, node);
             return node;
         }
 
-        public void AddEdgeFromTo(int node1Index, int node2Index)
+        public void AddMultiEdge(int node1Key, int node2Key)
         {
-            Node node1 = Nodes[node1Index]; 
-            Node node2 = Nodes[node2Index];
-            AddEdgeFromTo(node1, node2);
-        }
-
-        public void AddEdgeFromTo(Node node1, Node node2)
-        {     
-            node1.AddNeighbor(node2);
-            Edges.Add(new Node[] { node1, node2 });                     
+            Node node1 = NodesDict[node1Key];
+            Node node2 = NodesDict[node2Key];
+            AddMultiEdge(node1, node2);
         }
 
         public void AddMultiEdge(Node node1, Node node2)
-        {
-            AddEdgeFromTo(node1, node2);
-            AddEdgeFromTo(node2, node1);
+        {     
+            var edge = new Node[] { node1, node2 };
+            edgesCounter++;
+            EdgesDict.Add(edgesCounter, edge);
+            node1.EdgesIds.Add(edgesCounter);
+            node2.EdgesIds.Add(edgesCounter);
         }
+
 
         // repeat
         public int Contract()
         {
             Random random = new();
-
-            while (Nodes.Count > 2 && Edges.Count > 0)
+            
+            while (NodesDict.Count > 2 && EdgesDict.Count > 0)
             {
-                int r = random.Next(Edges.Count);
-                Node[] e = Edges[r];
+                nodesCounter++; 
+                int r = random.Next(EdgesDict.Count);
+                Node[] e = EdgesDict.ElementAt(r).Value;
                 Contract(e);
             }
 
-            return Nodes[0].Neighbors.Count;
+            return NodesDict.First().Value.EdgesIds.Count;
         }
 
         public void Contract(Node[] edge)
         {
-            Node mergedNode = AddNode(-1);
+            Node mergedNode = AddNode(-nodesCounter);
             mergedNode.SuperVertexNodes.RemoveAt(0);
             
             Node node1 = edge[0];
@@ -102,28 +103,29 @@ namespace Algo
             Merge(mergedNode, node1, node2);
             Merge(mergedNode, node2, node1);
 
-            int removed = Edges.RemoveAll(e => e[1] == node1 || e[1] == node2
-                                            || e[0] == node1 || e[0] == node2);
+            node1.EdgesIds.ForEach(id => EdgesDict.Remove(id));
+            node2.EdgesIds.ForEach(id => EdgesDict.Remove(id));
 
-            removed = Nodes.RemoveAll(n => n.Equals(node1) || n.Equals(node2));
-            
-            //
+            NodesDict.Remove(node1.Val);
+            NodesDict.Remove(node2.Val);
 
             void Merge(Node mergedNode, Node node1, Node skipNode)
             {             
-                var neighbors = node1.Neighbors;
-                foreach (Node neighbor in neighbors)
+                var neighbors = node1.EdgesIds;
+                foreach (int edgeId in neighbors)
                 {
+                    var edge = EdgesDict[edgeId];
+                    var neighbor = (edge[1] == node1)? edge[0] : edge[1];
                     if (neighbor == node1 || neighbor == skipNode)
                     {
                         continue;
                     }
 
-                    AddMultiEdge(mergedNode, neighbor);                    
-                    neighbor.RemoveNeighbor(node1);
-                }            
+                    AddMultiEdge(mergedNode, neighbor);
+                    neighbor.RemoveEdge(edgeId);
+                    EdgesDict.Remove(edgeId);
+                }
             }
-        }
-        
+        }        
     }    
 }
